@@ -1,0 +1,8 @@
+-- CreateTable
+CREATE TABLE "CoffeeEntry" (
+    "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "beans" TEXT NOT NULL,
+    "amountMl" INTEGER NOT NULL,
+    "notes" TEXT
+);
