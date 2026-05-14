@@ -1,0 +1,1 @@
+ALTER TABLE "CoffeeEntry" ADD COLUMN "rating" DOUBLE PRECISION;

@@ -1,0 +1,65 @@
+services:
+  db:
+    image: postgres:15
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: coffee_tracker_dev
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    ports:
+      - '5433:5432'
+
+  server:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    working_dir: /usr/src/app
+    entrypoint: ['/usr/src/app/docker-entrypoint.sh']
+    command: ['npm', 'run', 'dev']
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: 'postgresql://postgres:postgres@db:5432/coffee_tracker_dev'
+      PORT: '4000'
+      NODE_ENV: development
+      JWT_SECRET: 'dev-secret-change-in-prod'
+      CHOKIDAR_USEPOLLING: 'true'
+    depends_on:
+      - db
+    ports:
+      - '4000:4000'
+    volumes:
+      - ./server:/usr/src/app
+      - /usr/src/app/node_modules
+    develop:
+      watch:
+        - action: rebuild
+          path: ./server/package.json
+
+  client:
+    image: node:20-alpine
+    working_dir: /app
+    command: sh -c "npm install && npm run dev"
+    restart: unless-stopped
+    environment:
+      NEXT_PUBLIC_API_URL: 'http://localhost:4000'
+      NODE_ENV: development
+      WATCHPACK_POLLING: 'true'
+      NEXT_DISABLE_TURBOPACK: '1'
+    ports:
+      - '3000:3000'
+    depends_on:
+      - server
+    volumes:
+      - ./client:/app
+      - ./shared:/app/../shared
+      - /app/node_modules
+    develop:
+      watch:
+        - action: sync+restart
+          path: ./client/package.json
+          target: /app/package.json
+
+volumes:
+  db_data:

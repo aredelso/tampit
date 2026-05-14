@@ -8,14 +8,17 @@
     "client": "npm --prefix client run dev",
     "server": "npm --prefix server run dev",
     "start": "concurrently \"npm run server\" \"npm run client\"",
-    "prepare": "husky install"
+    "prepare": "husky install",
+    "migrate": "bash ./scripts/migrate.sh",
+    "migrate:new": "bash ./scripts/migrate.sh"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "type": "commonjs",
   "devDependencies": {
-    "concurrently": "^9.2.1"
+    "concurrently": "^9.2.1",
+    "prettier": "^3.8.3"
   },
   "private": true
 }

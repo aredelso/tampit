@@ -1,0 +1,1 @@
+ALTER TABLE "Coffee" ADD COLUMN "photoUrl" TEXT;

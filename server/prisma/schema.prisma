@@ -6,19 +6,104 @@
 generator client {
   provider = "prisma-client-js"
   output   = "../generated/prisma"
+  // include targets for common dev runtimes: host (native), alpine (linux-musl), and Debian/OpenSSL
+  binaryTargets = ["native", "linux-musl", "debian-openssl-1.1.x"]
 }
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
+}
+
+model Roaster {
+  id      Int           @id @default(autoincrement())
+  name    String        @unique
+  location String?
+  logoUrl String?
+  entries CoffeeEntry[]
+  coffees Coffee[]
+}
+
+model Coffee {
+  id          Int           @id @default(autoincrement())
+  name        String
+  origin      String?
+  process     String?
+  description String?
+  photoUrl    String?
+  roasterId   Int
+  roaster     Roaster       @relation(fields: [roasterId], references: [id])
+  entries     CoffeeEntry[]
+
+  @@unique([name, roasterId])
 }
 
 model CoffeeEntry {
+  id         Int      @id @default(autoincrement())
+  createdAt  DateTime @default(now())
+  roasterId  Int
+  roaster    Roaster @relation(fields: [roasterId], references: [id])
+  coffeeId    Int
+  coffee   Coffee  @relation(fields: [coffeeId], references: [id])
+  flavorNotes String[]
+  origin     String?
+  brewMethod String
+  dose       Int?
+  waterMl    Int?
+  userId     String
+  user       User     @relation(fields: [userId], references: [id])
+  notes      String?
+  rating     Float?
+  photoUrl   String?
+  likes      Like[]
+  comments   Comment[]
+}
+
+model FlavorTag {
+  id   Int    @id @default(autoincrement())
+  name String @unique
+}
+
+model User {
+  id           String        @id @default(cuid())
+  name         String?
+  email        String?       @unique
+  passwordHash String?
+  photo        String?
+  entries      CoffeeEntry[]
+  likes        Like[]
+  comments     Comment[]
+  commentLikes CommentLike[]
+}
+
+model Like {
+  id        Int         @id @default(autoincrement())
+  createdAt DateTime    @default(now())
+  user      User        @relation(fields: [userId], references: [id])
+  userId    String
+  entry     CoffeeEntry @relation(fields: [entryId], references: [id])
+  entryId   Int
+
+  @@unique([userId, entryId])
+}
+
+model Comment {
+  id        Int           @id @default(autoincrement())
+  createdAt DateTime      @default(now())
+  content   String
+  user      User          @relation(fields: [userId], references: [id])
+  userId    String
+  entry     CoffeeEntry   @relation(fields: [entryId], references: [id])
+  entryId   Int
+  likes     CommentLike[]
+}
+
+model CommentLike {
   id        Int      @id @default(autoincrement())
   createdAt DateTime @default(now())
-  roaster   String
-  coffee    String
-  brewMethod String
-  amountMl  Int
-  notes     String?
+  user      User     @relation(fields: [userId], references: [id])
+  userId    String
+  comment   Comment  @relation(fields: [commentId], references: [id])
+  commentId Int
+
+  @@unique([userId, commentId])
 }
