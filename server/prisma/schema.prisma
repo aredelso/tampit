@@ -4,23 +4,30 @@
 // Get a free hosted Postgres database in seconds: `npx create-db`
 
 generator client {
-  provider = "prisma-client-js"
-  output   = "../generated/prisma"
-  // include targets for common dev runtimes: host (native), alpine (linux-musl), and Debian/OpenSSL
-  binaryTargets = ["native", "linux-musl", "debian-openssl-1.1.x"]
+  provider      = "prisma-client-js"
+  output        = "../generated/prisma"
+  binaryTargets = ["native", "windows"]
 }
 
 datasource db {
   provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
 
 model Roaster {
-  id      Int           @id @default(autoincrement())
-  name    String        @unique
-  location String?
-  logoUrl String?
-  entries CoffeeEntry[]
-  coffees Coffee[]
+  id           Int           @id @default(autoincrement())
+  name         String        @unique
+  contactEmail String?
+  location     String?
+  logoUrl      String?
+  userId       String?
+  user         User?         @relation("RoasterOwner", fields: [userId], references: [id], onDelete: SetNull)
+  manager      User?         @relation("RoasterManager")
+  entries      CoffeeEntry[]
+  coffees      Coffee[]
+  followers    RoasterFollow[] @relation("RoasterFollows")
+
+  @@index([userId])
 }
 
 model Coffee {
@@ -33,6 +40,8 @@ model Coffee {
   roasterId   Int
   roaster     Roaster       @relation(fields: [roasterId], references: [id])
   entries     CoffeeEntry[]
+  wishlist    Wishlist[]
+  inventory   CoffeeInventory[]
 
   @@unique([name, roasterId])
 }
@@ -54,6 +63,8 @@ model CoffeeEntry {
   notes      String?
   rating     Float?
   photoUrl   String?
+  recipeId   Int?
+  recipe     Recipe?  @relation(fields: [recipeId], references: [id])
   likes      Like[]
   comments   Comment[]
 }
@@ -63,16 +74,34 @@ model FlavorTag {
   name String @unique
 }
 
+enum UserType {
+  STANDARD
+  ROASTER
+}
+
 model User {
-  id           String        @id @default(cuid())
-  name         String?
-  email        String?       @unique
-  passwordHash String?
-  photo        String?
-  entries      CoffeeEntry[]
-  likes        Like[]
-  comments     Comment[]
-  commentLikes CommentLike[]
+  id              String        @id @default(cuid())
+  name            String?
+  email           String?       @unique
+  passwordHash    String?
+  photo           String?
+  userType        UserType      @default(STANDARD)
+  verified        Boolean       @default(false)
+  googleId        String?       @unique
+  roasterId       Int?          @unique
+  roaster         Roaster?      @relation("RoasterManager", fields: [roasterId], references: [id], onDelete: SetNull)
+  entries         CoffeeEntry[]
+  likes           Like[]
+  comments        Comment[]
+  commentLikes    CommentLike[]
+  wishlist        Wishlist[]
+  recipes         Recipe[]
+  recipeLikes     RecipeLike[]
+  roasters        Roaster[]      @relation("RoasterOwner")
+  following       UserFollow[]    @relation("UserFollowing")
+  followers       UserFollow[]    @relation("UserFollowers")
+  roasterFollows  RoasterFollow[] @relation("RoasterFollowers")
+  inventory       CoffeeInventory[]
 }
 
 model Like {
@@ -106,4 +135,101 @@ model CommentLike {
   commentId Int
 
   @@unique([userId, commentId])
+}
+
+model Wishlist {
+  id        Int      @id @default(autoincrement())
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id])
+  userId    String
+  coffeeId  Int
+  coffee    Coffee   @relation(fields: [coffeeId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, coffeeId])
+}
+
+model Recipe {
+  id          Int      @id @default(autoincrement())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  title       String
+  description String?
+  instructions String?
+  brewMethod  String?
+  grindSize   String?
+  phases      Json     @default("[]")
+  dose  Int?
+  waterMl  Int?
+  brewTime    Int?
+  notes       String?
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  likes       RecipeLike[]
+  entries     CoffeeEntry[]
+
+  @@index([userId])
+}
+
+model RecipeLike {
+  id        Int      @id @default(autoincrement())
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id])
+  userId    String
+  recipe    Recipe   @relation(fields: [recipeId], references: [id])
+  recipeId  Int
+
+  @@unique([userId, recipeId])
+}
+
+model UserFollow {
+  id          Int      @id @default(autoincrement())
+  createdAt   DateTime @default(now())
+  followerId  String
+  follower    User     @relation("UserFollowing", fields: [followerId], references: [id], onDelete: Cascade)
+  followingId String
+  following   User     @relation("UserFollowers", fields: [followingId], references: [id], onDelete: Cascade)
+
+  @@unique([followerId, followingId])
+  @@index([followerId])
+  @@index([followingId])
+}
+
+model RoasterFollow {
+  id         Int      @id @default(autoincrement())
+  createdAt  DateTime @default(now())
+  followerId String
+  follower   User     @relation("RoasterFollowers", fields: [followerId], references: [id], onDelete: Cascade)
+  roasterId  Int
+  roaster    Roaster  @relation("RoasterFollows", fields: [roasterId], references: [id], onDelete: Cascade)
+
+  @@unique([followerId, roasterId])
+  @@index([followerId])
+  @@index([roasterId])
+}
+
+model CoffeeInventory {
+  id        Int      @id @default(autoincrement())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  coffeeId  Int
+  coffee    Coffee   @relation(fields: [coffeeId], references: [id], onDelete: Cascade)
+  roastDate DateTime?
+  quantity  Int      @default(1)
+  notes     String?
+
+  @@unique([userId, coffeeId])
+  @@index([userId])
+  @@index([coffeeId])
+}
+
+model VerificationToken {
+  id        Int      @id @default(autoincrement())
+  token     String   @unique
+  email     String
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+
+  @@index([email])
 }

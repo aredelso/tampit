@@ -16,6 +16,7 @@ export type EntryBody = {
   rating?: number;
   photoUrl?: string;
   flavorNotes?: string[];
+  recipeId?: number;
 };
 
 @Injectable()
@@ -41,31 +42,45 @@ export class EntriesService {
       dose: e.dose > 0 ? e.dose : undefined,
       waterMl: e.waterMl > 0 ? e.waterMl : undefined,
       likes: e.likes.length,
-      likedBy: e.likes.map((l: any) => l.user?.name ?? l.userId),
+      likedBy: e.likes.map((l: any) => ({
+        userId: l.userId,
+        userName: l.user.name,
+      })),
       comments: e.comments.map((c: any) => ({
         id: c.id,
         content: c.content,
         userId: c.userId,
-        userName: c.user?.name ?? null,
-        userPhoto: c.user?.photo ?? null,
+        userName: c.user.name,
+        userPhoto: c.user.photo ?? null,
         createdAt: c.createdAt.toISOString(),
         likes: c.likes?.length ?? 0,
-        likedBy: c.likes?.map((l: any) => l.user?.name ?? l.userId) ?? [],
+        likedBy:
+          c.likes?.map((l: any) => ({
+            userId: l.userId,
+            userName: l.user.name,
+          })) ?? [],
       })),
-      userId: e.userId ?? null,
-      userName: e.user?.name ?? null,
-      userPhoto: e.user?.photo ?? null,
+      userId: e.userId,
+      userName: e.user.name,
+      userPhoto: e.user.photo ?? null,
       notes: e.notes,
       rating: e.rating ?? null,
       photoUrl: e.photoUrl ?? null,
       flavorNotes: e.flavorNotes ?? [],
+      recipeId: e.recipeId ?? null,
     };
   }
 
   private readonly include = {
     roaster: { select: { id: true, name: true, logoUrl: true } },
     coffee: { select: { id: true, name: true, photoUrl: true } },
-    likes: { select: { userId: true, user: { select: { name: true } } } },
+    likes: {
+      select: {
+        userId: true,
+        createdAt: true,
+        user: { select: { name: true } },
+      },
+    },
     comments: {
       select: {
         id: true,
@@ -84,7 +99,89 @@ export class EntriesService {
       orderBy: { createdAt: 'desc' },
       include: this.include,
     });
-    return entries.map((e) => this.mapEntry(e));
+    return entries.map((e: any) => this.mapEntry(e));
+  }
+
+  async getPaginatedFeed(
+    page: number,
+    limit: number,
+    feed?: string,
+    userId?: string
+  ) {
+    let where: any = {};
+
+    if (feed === 'following' && userId) {
+      const [followedUsers, followedRoasters] = await Promise.all([
+        this.prisma.userFollow.findMany({
+          where: { followerId: userId },
+          select: { followingId: true },
+        }),
+        this.prisma.roasterFollow.findMany({
+          where: { followerId: userId },
+          select: { roasterId: true },
+        }),
+      ]);
+
+      const followedUserIds = followedUsers.map((f: any) => f.followingId);
+      const followedRoasterIds = followedRoasters.map((f: any) => f.roasterId);
+
+      if (followedUserIds.length === 0 && followedRoasterIds.length === 0) {
+        return {
+          data: [],
+          pagination: { page, limit, total: 0, totalPages: 0 },
+        };
+      }
+
+      where = {
+        OR: [
+          { userId: { in: followedUserIds } },
+          { roasterId: { in: followedRoasterIds } },
+        ],
+      };
+    }
+
+    const allEntries = await this.prisma.coffeeEntry.findMany({
+      where,
+      include: this.include,
+    });
+
+    // Calculate last activity date for each entry
+    const entriesWithActivity = allEntries.map((entry: any) => {
+      const latestCommentDate = entry.comments.length
+        ? Math.max(...entry.comments.map((c: any) => c.createdAt.getTime()))
+        : 0;
+      const latestLikeDate = entry.likes.length
+        ? Math.max(...entry.likes.map((l: any) => l.createdAt?.getTime() ?? 0))
+        : 0;
+      const lastActivityDate = Math.max(
+        entry.createdAt.getTime(),
+        latestCommentDate,
+        latestLikeDate
+      );
+
+      return { entry, lastActivityDate };
+    });
+
+    // Sort by last activity date (most recent first)
+    entriesWithActivity.sort(
+      (a: any, b: any) => b.lastActivityDate - a.lastActivityDate
+    );
+
+    const total = entriesWithActivity.length;
+    const skip = (page - 1) * limit;
+    const paginatedEntries = entriesWithActivity
+      .slice(skip, skip + limit)
+      .map((item: any) => item.entry);
+
+    return {
+      data: paginatedEntries.map((e: any) => this.mapEntry(e)),
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
   }
 
   async findByUser(userId: string) {
@@ -93,7 +190,15 @@ export class EntriesService {
       orderBy: { createdAt: 'desc' },
       include: this.include,
     });
-    return entries.map((e) => this.mapEntry(e));
+    return entries.map((e: any) => this.mapEntry(e));
+  }
+
+  async findById(id: number) {
+    const entry = await this.prisma.coffeeEntry.findUnique({
+      where: { id },
+      include: this.include,
+    });
+    return entry ? this.mapEntry(entry) : null;
   }
 
   async findByCoffee(coffeeId: number) {
@@ -106,7 +211,7 @@ export class EntriesService {
       orderBy: { createdAt: 'desc' },
       include: this.include,
     });
-    return entries.map((e) => this.mapEntry(e));
+    return entries.map((e: any) => this.mapEntry(e));
   }
 
   async findByFlavorNote(tag: string) {
@@ -115,7 +220,65 @@ export class EntriesService {
       orderBy: { createdAt: 'desc' },
       include: this.include,
     });
-    return entries.map((e) => this.mapEntry(e));
+    return entries.map((e: any) => this.mapEntry(e));
+  }
+
+  async getCoffeesByTag(tag: string) {
+    const entries = await this.prisma.coffeeEntry.findMany({
+      where: { flavorNotes: { has: tag } },
+      include: {
+        coffee: { select: { id: true, name: true } },
+        roaster: { select: { id: true, name: true, logoUrl: true } },
+      },
+    });
+
+    const coffeeMap = new Map<
+      number,
+      {
+        coffeeId: number;
+        coffeeName: string;
+        roasterId: number;
+        roasterName: string;
+        roasterLogoUrl: string | null;
+        count: number;
+        ratingSum: number;
+        ratingCount: number;
+      }
+    >();
+
+    for (const e of entries) {
+      const existing = coffeeMap.get(e.coffeeId);
+      if (existing) {
+        existing.count += 1;
+        if (e.rating != null) {
+          existing.ratingSum += e.rating;
+          existing.ratingCount += 1;
+        }
+      } else {
+        coffeeMap.set(e.coffeeId, {
+          coffeeId: e.coffeeId,
+          coffeeName: e.coffee.name,
+          roasterId: e.roaster.id,
+          roasterName: e.roaster.name,
+          roasterLogoUrl: e.roaster.logoUrl,
+          count: 1,
+          ratingSum: e.rating ?? 0,
+          ratingCount: e.rating != null ? 1 : 0,
+        });
+      }
+    }
+
+    return [...coffeeMap.values()]
+      .map((c) => ({
+        ...c,
+        avgRating: c.ratingCount > 0 ? c.ratingSum / c.ratingCount : null,
+      }))
+      .sort((a, b) => {
+        const aRating = a.avgRating ?? -1;
+        const bRating = b.avgRating ?? -1;
+        if (bRating !== aRating) return bRating - aRating;
+        return b.count - a.count;
+      });
   }
 
   async findByRoaster(roasterId: number) {
@@ -124,7 +287,7 @@ export class EntriesService {
       orderBy: { createdAt: 'desc' },
       include: this.include,
     });
-    return entries.map((e) => this.mapEntry(e));
+    return entries.map((e: any) => this.mapEntry(e));
   }
 
   private async resolveRoasterAndCoffee(body: EntryBody) {
@@ -165,6 +328,7 @@ export class EntriesService {
         rating: body.rating ?? null,
         photoUrl: body.photoUrl ?? null,
         flavorNotes,
+        recipeId: body.recipeId ?? null,
       },
       include: this.include,
     });
@@ -189,6 +353,7 @@ export class EntriesService {
         rating: body.rating ?? null,
         photoUrl: body.photoUrl ?? null,
         flavorNotes,
+        recipeId: body.recipeId ?? null,
       },
       include: this.include,
     });
@@ -206,7 +371,7 @@ export class EntriesService {
       orderBy: { name: 'asc' },
       select: { name: true },
     });
-    return roasters.map((r) => r.name);
+    return roasters.map((r: any) => r.name);
   }
 
   async addLike(entryId: number, userId: string) {
@@ -229,7 +394,7 @@ export class EntriesService {
       where: { entryId },
       orderBy: { createdAt: 'asc' },
     });
-    return comments.map((c) => ({
+    return comments.map((c: any) => ({
       id: c.id,
       content: c.content,
       userId: c.userId,
@@ -273,7 +438,7 @@ export class EntriesService {
       type: 'likes_updated',
       entryId,
       likes: likes.length,
-      likedBy: likes.map((l) => l.user?.name ?? l.userId),
+      likedBy: likes.map((l: any) => l.user?.name ?? l.userId),
     });
   }
 }

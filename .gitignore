@@ -1,5 +1,6 @@
 node_modules/
 **/node_modules/
+.ec2-instance
 .env
 .env.local
 *.sqlite

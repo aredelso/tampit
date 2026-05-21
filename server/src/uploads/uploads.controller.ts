@@ -9,6 +9,7 @@ import { diskStorage } from 'multer';
 import { extname, join } from 'path';
 import { randomUUID } from 'crypto';
 import { mkdirSync } from 'fs';
+import type { Request } from 'express';
 
 const UPLOADS_DIR = join(process.cwd(), 'uploads');
 mkdirSync(UPLOADS_DIR, { recursive: true });
@@ -22,7 +23,7 @@ export class UploadsController {
     FileInterceptor('file', {
       storage: diskStorage({
         destination: UPLOADS_DIR,
-        filename: (_req, file, cb) => {
+        filename: (_req: Request, file: Express.Multer.File, cb: (error: Error | null, filename: string) => void) => {
           cb(null, `${randomUUID()}${extname(file.originalname)}`);
         },
       }),

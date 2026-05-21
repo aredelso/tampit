@@ -8,15 +8,35 @@ import {
   Param,
   Post,
   Put,
+  Query,
   Req,
+  ForbiddenException,
 } from '@nestjs/common';
 import type { Request } from 'express';
 import { EntriesService, EntryBody } from './entries.service';
-import { extractUserId } from '../auth/extract-user';
+import { extractUserId, extractToken } from '../auth/extract-user';
 
 @Controller('entries')
 export class EntriesController {
   constructor(private readonly entries: EntriesService) {}
+
+  @Get('feed')
+  feed(
+    @Query('page') page = '1',
+    @Query('limit') limit = '10',
+    @Query('feed') feedType?: string,
+    @Req() req?: Request
+  ) {
+    let userId: string | undefined;
+    if (feedType === 'following' && req) {
+      try {
+        userId = extractUserId(req);
+      } catch {
+        throw new ForbiddenException('Authentication required for following feed');
+      }
+    }
+    return this.entries.getPaginatedFeed(Number(page), Number(limit), feedType, userId);
+  }
 
   @Get()
   findAll() {
@@ -28,6 +48,11 @@ export class EntriesController {
     return this.entries.findByFlavorNote(tag);
   }
 
+  @Get('coffees-by-tag/:tag')
+  getCoffeesByTag(@Param('tag') tag: string) {
+    return this.entries.getCoffeesByTag(tag);
+  }
+
   @Get('by-coffee/:coffeeId')
   findByCoffee(@Param('coffeeId') coffeeId: string) {
     return this.entries.findByCoffee(Number(coffeeId));
@@ -35,13 +60,23 @@ export class EntriesController {
 
   @Post()
   @HttpCode(201)
-  create(@Body() body: EntryBody) {
-    return this.entries.create(body);
+  create(@Body() body: EntryBody, @Req() req: Request) {
+    const token = extractToken(req);
+    if (token.userType !== 'STANDARD')
+      throw new ForbiddenException('Only standard users can create entries');
+    return this.entries.create({ ...body, userId: token.userId });
   }
 
   @Put(':id')
-  update(@Param('id') id: string, @Body() body: EntryBody) {
-    return this.entries.update(Number(id), body);
+  update(
+    @Param('id') id: string,
+    @Body() body: EntryBody,
+    @Req() req: Request
+  ) {
+    const token = extractToken(req);
+    if (token.userType !== 'STANDARD')
+      throw new ForbiddenException('Only standard users can update entries');
+    return this.entries.update(Number(id), { ...body, userId: token.userId });
   }
 
   @Delete(':id')

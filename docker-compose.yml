@@ -1,11 +1,14 @@
+name: tampit
+
 services:
   db:
     image: postgres:15
+    container_name: tampit-db
     restart: unless-stopped
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: coffee_tracker_dev
+      POSTGRES_DB: tampit_dev
     volumes:
       - db_data:/var/lib/postgresql/data
     ports:
@@ -15,12 +18,13 @@ services:
     build:
       context: ./server
       dockerfile: Dockerfile
+    container_name: tampit-server
     working_dir: /usr/src/app
     entrypoint: ['/usr/src/app/docker-entrypoint.sh']
     command: ['npm', 'run', 'dev']
     restart: unless-stopped
     environment:
-      DATABASE_URL: 'postgresql://postgres:postgres@db:5432/coffee_tracker_dev'
+      DATABASE_URL: 'postgresql://postgres:postgres@db:5432/tampit_dev'
       PORT: '4000'
       NODE_ENV: development
       JWT_SECRET: 'dev-secret-change-in-prod'
@@ -38,28 +42,26 @@ services:
           path: ./server/package.json
 
   client:
-    image: node:20-alpine
-    working_dir: /app
-    command: sh -c "npm install && npm run dev"
+    build:
+      context: ./client
+      dockerfile: Dockerfile
+    container_name: tampit-client
     restart: unless-stopped
     environment:
-      NEXT_PUBLIC_API_URL: 'http://localhost:4000'
       NODE_ENV: development
-      WATCHPACK_POLLING: 'true'
-      NEXT_DISABLE_TURBOPACK: '1'
-    ports:
-      - '3000:3000'
+      API_URL: 'http://localhost:4000'
     depends_on:
       - server
+    ports:
+      - '3000:3000'
     volumes:
-      - ./client:/app
-      - ./shared:/app/../shared
-      - /app/node_modules
+      - ./client:/usr/src/app
+      - /usr/src/app/node_modules
+      - /usr/src/app/.next
     develop:
       watch:
-        - action: sync+restart
+        - action: rebuild
           path: ./client/package.json
-          target: /app/package.json
 
 volumes:
   db_data:

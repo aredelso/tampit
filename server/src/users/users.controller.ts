@@ -11,8 +11,14 @@ export class UsersController {
 
   @Post()
   @HttpCode(201)
-  create(@Body() body: { name?: string; email?: string }) {
-    return this.users.create(body.name ?? null, body.email ?? null);
+  create(
+    @Body() body: { name?: string; email?: string; roasterId?: number | null }
+  ) {
+    return this.users.create(
+      body.name ?? null,
+      body.email ?? null,
+      body.roasterId ?? null
+    );
   }
 
   @Get(':id')

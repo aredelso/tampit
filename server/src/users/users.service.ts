@@ -1,18 +1,33 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { User } from '../../generated/prisma';
 
 @Injectable()
 export class UsersService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async create(name: string | null, email: string | null) {
-    return this.prisma.user.create({ data: { name, email } });
+  async create(
+    name: string | null,
+    email: string | null,
+    roasterId?: number | null
+  ) {
+    return this.prisma.user.create({
+      data: { name, email, roasterId: roasterId ?? undefined },
+    });
   }
 
   async findOne(id: string) {
     const user = await this.prisma.user.findUnique({
       where: { id },
-      select: { id: true, name: true, email: true, photo: true },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        photo: true,
+        roasterId: true,
+        userType: true,
+        verified: true,
+      },
     });
     if (!user) throw new NotFoundException('User not found');
     return user;
@@ -28,15 +43,15 @@ export class UsersService {
 
     if (!groups.length) return [];
 
-    const coffeeIds = groups.map((g) => g.coffeeId);
+    const coffeeIds = groups.map((g: any) => g.coffeeId);
     const coffees = await this.prisma.coffee.findMany({
       where: { id: { in: coffeeIds } },
       include: { roaster: { select: { id: true, name: true, logoUrl: true } } },
     });
 
-    const byId = Object.fromEntries(coffees.map((c) => [c.id, c]));
+    const byId = Object.fromEntries(coffees.map((c: any) => [c.id, c]));
     return groups
-      .map((g) => {
+      .map((g: any) => {
         const c = byId[g.coffeeId];
         if (!c) return null;
         return {
@@ -51,7 +66,7 @@ export class UsersService {
         };
       })
       .filter(Boolean)
-      .sort((a, b) => b!.entryCount - a!.entryCount);
+      .sort((a: any, b: any) => b!.entryCount - a!.entryCount);
   }
 
   async findEntries(id: string) {
@@ -59,6 +74,7 @@ export class UsersService {
       where: { userId: id },
       orderBy: { createdAt: 'desc' },
       include: {
+        coffee: { select: { id: true, name: true } },
         roaster: { select: { name: true } },
         likes: { select: { userId: true, user: { select: { name: true } } } },
         comments: {
@@ -67,17 +83,17 @@ export class UsersService {
         user: { select: { id: true, name: true, email: true } },
       },
     });
-    return entries.map((e) => ({
+    return entries.map((e: any) => ({
       id: e.id,
       createdAt: e.createdAt.toISOString(),
       roaster: e.roaster?.name ?? '',
-      coffee: e.coffee,
+      coffee: e.coffee?.name ?? '',
       brewMethod: e.brewMethod,
       dose: e.dose,
       waterMl: e.waterMl,
       likes: e.likes.length,
-      likedBy: e.likes.map((l) => l.user?.name ?? l.userId),
-      comments: e.comments.map((c) => ({
+      likedBy: e.likes.map((l: any) => l.user?.name ?? l.userId),
+      comments: e.comments.map((c: any) => ({
         id: c.id,
         content: c.content,
         userId: c.userId,

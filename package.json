@@ -1,5 +1,5 @@
 {
-  "name": "coffee-tracker",
+  "name": "tampit",
   "version": "1.0.0",
   "description": "",
   "main": "index.js",
@@ -8,6 +8,14 @@
     "client": "npm --prefix client run dev",
     "server": "npm --prefix server run dev",
     "start": "concurrently \"npm run server\" \"npm run client\"",
+    "build": "npm --prefix server run build && npm --prefix client run build",
+    "build:server": "npm --prefix server run build",
+    "build:client": "npm --prefix client run build",
+    "docker": "docker-compose up",
+    "docker:down": "docker-compose down",
+    "docker:build": "docker-compose build",
+    "docker:rebuild": "docker-compose down && docker-compose build && docker-compose up",
+    "docker:reset": "docker-compose down -v && docker-compose build && docker-compose up",
     "prepare": "husky install",
     "migrate": "bash ./scripts/migrate.sh",
     "migrate:new": "bash ./scripts/migrate.sh"

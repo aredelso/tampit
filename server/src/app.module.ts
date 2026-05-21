@@ -1,5 +1,7 @@
 import { Module, OnApplicationBootstrap } from '@nestjs/common';
 import * as bcrypt from 'bcryptjs';
+import { GraphQLModule } from '@nestjs/graphql';
+import { ApolloDriver, ApolloDriverConfig } from '@nestjs/apollo';
 import { PrismaModule } from './prisma/prisma.module';
 import { PrismaService } from './prisma/prisma.service';
 import { WsModule } from './ws/ws.module';
@@ -11,9 +13,19 @@ import { SeedModule } from './seed/seed.module';
 import { UploadsModule } from './uploads/uploads.module';
 import { CoffeesModule } from './coffees/coffees.module';
 import { TagsModule } from './tags/tags.module';
+import { WishlistModule } from './wishlist/wishlist.module';
+import { RecipesModule } from './recipes/recipes.module';
+import { FollowsModule } from './follows/follows.module';
+import { EmailModule } from './email/email.module';
+import { InventoryModule } from './inventory/inventory.module';
 
 @Module({
   imports: [
+    GraphQLModule.forRoot<ApolloDriverConfig>({
+      driver: ApolloDriver,
+      typePaths: ['src/**/*.gql'],
+      context: ({ req }: any) => ({ req }),
+    }),
     PrismaModule,
     WsModule,
     AuthModule,
@@ -24,6 +36,11 @@ import { TagsModule } from './tags/tags.module';
     UploadsModule,
     CoffeesModule,
     TagsModule,
+    WishlistModule,
+    RecipesModule,
+    FollowsModule,
+    EmailModule,
+    InventoryModule,
   ],
 })
 export class AppModule implements OnApplicationBootstrap {

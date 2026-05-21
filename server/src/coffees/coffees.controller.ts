@@ -9,8 +9,11 @@ import {
   Post,
   Put,
   Query,
+  Req,
 } from '@nestjs/common';
+import type { Request } from 'express';
 import { CoffeesService } from './coffees.service';
+import { extractUserId } from '../auth/extract-user';
 
 @Controller('coffees')
 export class CoffeesController {
@@ -83,5 +86,63 @@ export class CoffeesController {
   @HttpCode(204)
   remove(@Param('id') id: string) {
     return this.coffees.remove(Number(id));
+  }
+
+  @Post('my/create')
+  @HttpCode(201)
+  createForMyRoaster(
+    @Req() req: Request,
+    @Body()
+    body: {
+      name?: string;
+      origin?: string;
+      process?: string;
+      description?: string;
+      photoUrl?: string;
+    }
+  ) {
+    if (!body.name) throw new BadRequestException('name required');
+    const userId = extractUserId(req);
+    return this.coffees.createForRoaster(
+      userId,
+      body.name,
+      body.origin,
+      body.process,
+      body.description,
+      body.photoUrl
+    );
+  }
+
+  @Put('my/:id')
+  updateForMyRoaster(
+    @Param('id') id: string,
+    @Req() req: Request,
+    @Body()
+    body: {
+      name?: string;
+      origin?: string;
+      process?: string;
+      description?: string;
+      photoUrl?: string;
+    }
+  ) {
+    if (!body.name) throw new BadRequestException('name required');
+    const userId = extractUserId(req);
+    return this.coffees.updateForRoaster(
+      userId,
+      Number(id),
+      body.name,
+      body.origin,
+      body.process,
+      body.description,
+      body.photoUrl
+    );
+  }
+
+  @Delete('my/:id')
+  @HttpCode(204)
+  deleteForMyRoaster(@Param('id') id: string, @Req() req: Request) {
+    const userId = extractUserId(req);
+    return this.coffees.deleteForRoaster(userId, Number(id));
   }
 }

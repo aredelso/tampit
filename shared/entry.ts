@@ -1,3 +1,8 @@
+export type LikeInfo = {
+  userId: string;
+  userName: string | null;
+};
+
 export type Comment = {
   id: number;
   content: string;
@@ -6,7 +11,7 @@ export type Comment = {
   userPhoto?: string | null;
   createdAt: string;
   likes: number;
-  likedBy: string[];
+  likedBy: LikeInfo[];
 };
 
 export type Entry = {
@@ -23,7 +28,7 @@ export type Entry = {
   dose?: number;
   waterMl?: number;
   likes: number;
-  likedBy?: string[];
+  likedBy?: LikeInfo[];
   comments?: Comment[];
   userId: string | null;
   userName: string | null;

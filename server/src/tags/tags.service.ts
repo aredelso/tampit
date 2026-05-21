@@ -10,7 +10,7 @@ export class TagsService {
       orderBy: { name: 'asc' },
       select: { name: true },
     });
-    return tags.map((t) => t.name);
+    return tags.map((t: any) => t.name);
   }
 
   async topForCoffee(

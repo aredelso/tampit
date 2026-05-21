@@ -1,0 +1,154 @@
+type Query {
+  wishlist: [WishlistItem!]!
+  isInWishlist(coffeeId: Int!): Boolean!
+  recipes: [Recipe!]!
+  recipe(id: Int!): Recipe
+  userRecipes(userId: String!): [Recipe!]!
+}
+
+type Mutation {
+  addToWishlist(coffeeId: Int!): WishlistItem!
+  removeFromWishlist(coffeeId: Int!): Boolean!
+
+  likeEntry(entryId: Int!): Entry!
+  unlikeEntry(entryId: Int!): Entry!
+  commentEntry(entryId: Int!, content: String!): Entry!
+  likeComment(entryId: Int!, commentId: Int!): Entry!
+  unlikeComment(entryId: Int!, commentId: Int!): Entry!
+
+  createRecipe(input: CreateRecipeInput!): Recipe!
+  updateRecipe(id: Int!, input: UpdateRecipeInput!): Recipe!
+  deleteRecipe(id: Int!): Boolean!
+  likeRecipe(recipeId: Int!): Recipe!
+  unlikeRecipe(recipeId: Int!): Recipe!
+}
+
+input RecipePhaseInput {
+  name: String!
+  waterAmount: Int!
+  waterTemp: Int!
+  startTime: Int
+  notes: String
+}
+
+input CreateRecipeInput {
+  title: String!
+  description: String
+  instructions: String
+  brewMethod: String
+  grindSize: String
+  phases: [RecipePhaseInput!]!
+  brewTime: Int
+  dose: Int
+  waterMl: Int
+  notes: String
+}
+
+input UpdateRecipeInput {
+  title: String
+  description: String
+  instructions: String
+  brewMethod: String
+  grindSize: String
+  phases: [RecipePhaseInput!]
+  brewTime: Int
+  dose: Int
+  waterMl: Int
+  notes: String
+}
+
+type LikeInfo {
+  userId: String!
+  userName: String
+}
+
+type WishlistItem {
+  id: Int!
+  coffeeId: Int!
+  createdAt: String!
+  coffee: Coffee!
+}
+
+type Coffee {
+  id: Int!
+  name: String!
+  origin: String
+  process: String
+  description: String
+  photoUrl: String
+  roasterId: Int!
+  roaster: Roaster!
+}
+
+type Roaster {
+  id: Int!
+  name: String!
+  location: String
+  logoUrl: String
+}
+
+type Entry {
+  id: Int!
+  coffeeId: Int!
+  coffee: Coffee!
+  roasterId: Int!
+  roasterName: String!
+  roasterLogoUrl: String
+  coffeeName: String!
+  coffeePhotoUrl: String
+  origin: String
+  brewMethod: String!
+  dose: Float
+  waterMl: Float
+  notes: String
+  rating: Float
+  photoUrl: String
+  flavorNotes: [String!]!
+  likes: Int!
+  likedBy: [LikeInfo!]!
+  comments: [Comment!]!
+  userId: String
+  userName: String
+  userPhoto: String
+  createdAt: String!
+}
+
+type Comment {
+  id: Int!
+  content: String!
+  userId: String!
+  userName: String
+  userPhoto: String
+  createdAt: String!
+  likes: Int!
+  likedBy: [LikeInfo!]!
+}
+
+type RecipePhase {
+  name: String!
+  waterAmount: Int
+  waterTemp: Int
+  startTime: Int
+  notes: String
+}
+
+type Recipe {
+  id: Int!
+  title: String!
+  description: String
+  instructions: String
+  brewMethod: String
+  grindSize: String
+  phases: [RecipePhase!]!
+  brewTime: Int
+  dose: Int
+  waterMl: Int
+  notes: String
+  userId: String!
+  userName: String
+  userPhoto: String
+  likes: Int!
+  likedBy: [LikeInfo!]!
+  createdAt: String!
+  updatedAt: String!
+}
