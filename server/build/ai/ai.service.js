@@ -1,10 +1,43 @@
 "use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
 var __decorate = (this && this.__decorate) || function (decorators, target, key, desc) {
     var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
     if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
     else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
     return c > 3 && r && Object.defineProperty(target, key, r), r;
 };
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
 var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
@@ -15,13 +48,110 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.AiService = void 0;
 const common_1 = require("@nestjs/common");
 const groq_sdk_1 = __importDefault(require("groq-sdk"));
+const sdk_1 = __importDefault(require("@anthropic-ai/sdk"));
+const fs = __importStar(require("fs"));
+const path = __importStar(require("path"));
 let AiService = class AiService {
     constructor() {
-        const apiKey = process.env.GROQ_API_KEY;
-        if (!apiKey) {
+        const groqApiKey = process.env.GROQ_API_KEY;
+        if (!groqApiKey) {
             throw new Error('GROQ_API_KEY environment variable is not set');
         }
-        this.client = new groq_sdk_1.default({ apiKey });
+        this.groqClient = new groq_sdk_1.default({ apiKey: groqApiKey });
+        const claudeApiKey = process.env.ANTHROPIC_API_KEY;
+        if (!claudeApiKey) {
+            throw new Error('ANTHROPIC_API_KEY environment variable is not set');
+        }
+        this.claudeClient = new sdk_1.default({ apiKey: claudeApiKey });
+    }
+    async extractCoffeeDataFromImage(imagePath) {
+        if (!imagePath?.trim()) {
+            throw new common_1.BadRequestException('Image path is required');
+        }
+        // Read the image file
+        const absolutePath = path.resolve(imagePath);
+        if (!fs.existsSync(absolutePath)) {
+            throw new common_1.BadRequestException(`Image file not found: ${imagePath}`);
+        }
+        const imageBuffer = fs.readFileSync(absolutePath);
+        const base64Image = imageBuffer.toString('base64');
+        // Determine media type from file extension
+        const ext = path.extname(imagePath).toLowerCase();
+        let mediaType;
+        switch (ext) {
+            case '.jpg':
+            case '.jpeg':
+                mediaType = 'image/jpeg';
+                break;
+            case '.png':
+                mediaType = 'image/png';
+                break;
+            case '.gif':
+                mediaType = 'image/gif';
+                break;
+            case '.webp':
+                mediaType = 'image/webp';
+                break;
+            default:
+                throw new common_1.BadRequestException(`Unsupported image format: ${ext}. Supported formats: jpg, jpeg, png, gif, webp`);
+        }
+        return this.extractCoffeeDataFromBase64(base64Image, mediaType);
+    }
+    async extractCoffeeDataFromBase64(base64Image, mediaType) {
+        if (!base64Image?.trim()) {
+            throw new common_1.BadRequestException('Base64 image data is required');
+        }
+        const response = await this.claudeClient.messages.create({
+            model: 'claude-sonnet-4-20250514',
+            max_tokens: 500,
+            messages: [
+                {
+                    role: 'user',
+                    content: [
+                        {
+                            type: 'image',
+                            source: {
+                                type: 'base64',
+                                media_type: mediaType,
+                                data: base64Image,
+                            },
+                        },
+                        {
+                            type: 'text',
+                            text: `Extract coffee information from this coffee bag or label image. Return the data as a JSON object with the following fields (only include fields that are visible in the image):
+
+{
+  "name": "Coffee name/product name",
+  "origin": "Country or region of origin",
+  "variety": "Coffee variety/cultivar (e.g., Bourbon, Typica, Geisha)",
+  "farm": "Farm or estate name",
+  "process": "Processing method (e.g., Washed, Natural, Honey)",
+  "description": "Any other relevant information from the label",
+  "roasterName": "Name of the roasting company"
+}
+
+Return ONLY valid JSON, no additional text. If you cannot determine a field, omit it from the response.`,
+                        },
+                    ],
+                },
+            ],
+        });
+        const content = response.content[0];
+        if (content.type !== 'text') {
+            throw new common_1.BadRequestException('Failed to extract text from image');
+        }
+        try {
+            // Extract JSON from the response (handle cases where there might be extra text)
+            const jsonMatch = content.text.match(/\{[\s\S]*\}/);
+            if (!jsonMatch) {
+                throw new Error('No JSON found in response');
+            }
+            const extractedData = JSON.parse(jsonMatch[0]);
+            return extractedData;
+        }
+        catch (error) {
+            throw new common_1.BadRequestException(`Failed to parse extracted coffee data: ${error instanceof Error ? error.message : String(error)}`);
+        }
     }
     async extractContactEmailByRoasterName(roasterName) {
         if (!roasterName?.trim()) {
@@ -62,7 +192,7 @@ let AiService = class AiService {
             return null;
         }
         // Use Groq to extract contact email
-        const response = await this.client.chat.completions.create({
+        const response = await this.groqClient.chat.completions.create({
             model: 'mixtral-8x7b-32768',
             max_tokens: 100,
             messages: [
@@ -88,7 +218,7 @@ let AiService = class AiService {
     }
     async suggestWebsiteUrls(roasterName) {
         // Use Groq to generate likely website URLs based on roaster name
-        const response = await this.client.chat.completions.create({
+        const response = await this.groqClient.chat.completions.create({
             model: 'mixtral-8x7b-32768',
             max_tokens: 150,
             messages: [

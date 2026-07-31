@@ -18,6 +18,7 @@ import { RecipesModule } from './recipes/recipes.module';
 import { FollowsModule } from './follows/follows.module';
 import { EmailModule } from './email/email.module';
 import { InventoryModule } from './inventory/inventory.module';
+import { AiModule } from './ai/ai.module';
 
 @Module({
   imports: [
@@ -41,6 +42,7 @@ import { InventoryModule } from './inventory/inventory.module';
     FollowsModule,
     EmailModule,
     InventoryModule,
+    AiModule,
   ],
 })
 export class AppModule implements OnApplicationBootstrap {

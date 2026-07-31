@@ -12,7 +12,7 @@ services:
     volumes:
       - db_data:/var/lib/postgresql/data
     ports:
-      - '5433:5432'
+      - '5432:5432'
 
   server:
     build:
@@ -49,7 +49,9 @@ services:
     restart: unless-stopped
     environment:
       NODE_ENV: development
-      API_URL: 'http://localhost:4000'
+      NEXT_PUBLIC_API_URL: 'http://localhost:4000'
+      NEXT_PUBLIC_GOOGLE_CLIENT_ID: '676252717546-77drf8ctqkb373m52s6fn9abmrlej8q8.apps.googleusercontent.com'
+      API_URL: 'http://tampit-server:4000'
     depends_on:
       - server
     ports:

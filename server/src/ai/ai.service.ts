@@ -1,16 +1,116 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
 import Groq from 'groq-sdk';
+import * as fs from 'fs';
+import * as path from 'path';
+import * as Tesseract from 'tesseract.js';
+import type { ExtractedCoffeeData } from '@shared/coffee';
 
 @Injectable()
 export class AiService {
-  private client: Groq;
+  private groqClient: Groq;
 
   constructor() {
-    const apiKey = process.env.GROQ_API_KEY;
-    if (!apiKey) {
+    const groqApiKey = process.env.GROQ_API_KEY;
+    if (!groqApiKey) {
       throw new Error('GROQ_API_KEY environment variable is not set');
     }
-    this.client = new Groq({ apiKey });
+    this.groqClient = new Groq({ apiKey: groqApiKey });
+  }
+
+  async extractCoffeeDataFromImage(
+    imagePath: string
+  ): Promise<ExtractedCoffeeData> {
+    if (!imagePath?.trim()) {
+      throw new BadRequestException('Image path is required');
+    }
+
+    // Read the image file
+    const absolutePath = path.resolve(imagePath);
+    if (!fs.existsSync(absolutePath)) {
+      throw new BadRequestException(`Image file not found: ${imagePath}`);
+    }
+
+    const imageBuffer = fs.readFileSync(absolutePath);
+    const base64Image = imageBuffer.toString('base64');
+
+    return this.extractCoffeeDataFromBase64(base64Image);
+  }
+
+  async extractCoffeeDataFromBase64(
+    base64Image: string
+  ): Promise<ExtractedCoffeeData> {
+    if (!base64Image?.trim()) {
+      throw new BadRequestException('Base64 image data is required');
+    }
+
+    // Convert base64 to buffer
+    const imageBuffer = Buffer.from(base64Image, 'base64');
+
+    // Use Tesseract OCR to extract text from image
+    let ocrText: string;
+    try {
+      const result = await Tesseract.recognize(imageBuffer, 'eng');
+      ocrText = result.data.text;
+    } catch (error) {
+      throw new BadRequestException(
+        `Failed to extract text from image: ${error instanceof Error ? error.message : String(error)}`
+      );
+    }
+
+    if (!ocrText?.trim()) {
+      throw new BadRequestException(
+        'Could not extract any text from the image'
+      );
+    }
+
+    // Use Groq to analyze the extracted text
+    const response = await this.groqClient.chat.completions.create({
+      model: 'meta-llama/llama-4-scout-17b-16e-instruct',
+      max_tokens: 500,
+      messages: [
+        {
+          role: 'user',
+          content: `Analyze this coffee label text and extract coffee information. Return a JSON object with the following fields (only include fields that are present in the text):
+
+{
+  "name": "Coffee name/product name",
+  "origin": "Country or region of origin",
+  "variety": "Coffee variety/cultivar (e.g., Bourbon, Typica, Geisha)",
+  "farm": "Farm or estate name",
+  "process": "Processing method (e.g., Washed, Natural, Honey)",
+  "description": "Any other relevant information",
+  "roasterName": "Name of the roasting company"
+}
+
+Return ONLY valid JSON, no additional text. If you cannot determine a field, omit it from the response.
+
+Label text:
+${ocrText}`,
+        },
+      ],
+    });
+
+    const content = response.choices[0]?.message?.content;
+    if (!content) {
+      throw new BadRequestException(
+        'Failed to extract coffee data from image text'
+      );
+    }
+
+    try {
+      // Extract JSON from the response
+      const jsonMatch = content.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) {
+        throw new Error('No JSON found in response');
+      }
+
+      const extractedData = JSON.parse(jsonMatch[0]) as ExtractedCoffeeData;
+      return extractedData;
+    } catch (error) {
+      throw new BadRequestException(
+        `Failed to parse extracted coffee data: ${error instanceof Error ? error.message : String(error)}`
+      );
+    }
   }
 
   async extractContactEmailByRoasterName(
@@ -67,8 +167,8 @@ export class AiService {
     }
 
     // Use Groq to extract contact email
-    const response = await this.client.chat.completions.create({
-      model: 'mixtral-8x7b-32768',
+    const response = await this.groqClient.chat.completions.create({
+      model: 'meta-llama/llama-4-scout-17b-16e-instruct',
       max_tokens: 100,
       messages: [
         {
@@ -100,8 +200,8 @@ export class AiService {
 
   private async suggestWebsiteUrls(roasterName: string): Promise<string[]> {
     // Use Groq to generate likely website URLs based on roaster name
-    const response = await this.client.chat.completions.create({
-      model: 'mixtral-8x7b-32768',
+    const response = await this.groqClient.chat.completions.create({
+      model: 'meta-llama/llama-4-scout-17b-16e-instruct',
       max_tokens: 150,
       messages: [
         {
@@ -124,7 +224,7 @@ export class AiService {
       .slice(0, 3); // Limit to 3 URLs
   }
 
-  private async fetchWebsiteContent(url: string): Promise<string> {
+  private async fetchWebsiteContent(url: any): Promise<string> {
     // Ensure URL has protocol
     let normalizedUrl = url;
     if (

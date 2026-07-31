@@ -19,11 +19,38 @@ export class WishlistService {
   }
 
   async getByUser(userId: string) {
-    return this.prisma.wishlist.findMany({
+    const items = await this.prisma.wishlist.findMany({
       where: { userId },
-      include: { coffee: { include: { roaster: true } } },
+      include: {
+        coffee: {
+          include: {
+            roaster: true,
+          },
+        },
+      },
       orderBy: { createdAt: 'desc' },
     });
+
+    // Fetch stats for each coffee
+    const itemsWithStats = await Promise.all(
+      items.map(async (item) => {
+        const stats = await this.prisma.coffeeEntry.aggregate({
+          where: { coffeeId: item.coffee.id },
+          _count: true,
+          _avg: { rating: true },
+        });
+        return {
+          ...item,
+          coffee: {
+            ...item.coffee,
+            entryCount: stats._count,
+            avgRating: stats._avg.rating,
+          },
+        };
+      })
+    );
+
+    return itemsWithStats;
   }
 
   async isInWishlist(userId: string, coffeeId: number) {

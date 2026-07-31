@@ -3,7 +3,6 @@ export type Recipe = {
   userId: string;
   title: string;
   description?: string;
-  instructions?: string;
   brewMethod: string;
   grindSize?: string;
   dose: number;

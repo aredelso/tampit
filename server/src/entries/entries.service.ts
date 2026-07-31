@@ -73,7 +73,7 @@ export class EntriesService {
 
   private readonly include = {
     roaster: { select: { id: true, name: true, logoUrl: true } },
-    coffee: { select: { id: true, name: true, photoUrl: true } },
+    coffee: { select: { id: true, name: true, origin: true, variety: true, farm: true, photoUrl: true } },
     likes: {
       select: {
         userId: true,
@@ -224,60 +224,35 @@ export class EntriesService {
   }
 
   async getCoffeesByTag(tag: string) {
-    const entries = await this.prisma.coffeeEntry.findMany({
+    const stats = await this.prisma.coffeeEntry.groupBy({
+      by: ['coffeeId'],
       where: { flavorNotes: { has: tag } },
-      include: {
-        coffee: { select: { id: true, name: true } },
-        roaster: { select: { id: true, name: true, logoUrl: true } },
-      },
+      _count: true,
+      _avg: { rating: true },
     });
 
-    const coffeeMap = new Map<
-      number,
-      {
-        coffeeId: number;
-        coffeeName: string;
-        roasterId: number;
-        roasterName: string;
-        roasterLogoUrl: string | null;
-        count: number;
-        ratingSum: number;
-        ratingCount: number;
-      }
-    >();
+    const coffeeIds = stats.map((s) => s.coffeeId);
+    const coffees = await this.prisma.coffee.findMany({
+      where: { id: { in: coffeeIds } },
+      include: { roaster: true },
+    });
 
-    for (const e of entries) {
-      const existing = coffeeMap.get(e.coffeeId);
-      if (existing) {
-        existing.count += 1;
-        if (e.rating != null) {
-          existing.ratingSum += e.rating;
-          existing.ratingCount += 1;
-        }
-      } else {
-        coffeeMap.set(e.coffeeId, {
-          coffeeId: e.coffeeId,
-          coffeeName: e.coffee.name,
-          roasterId: e.roaster.id,
-          roasterName: e.roaster.name,
-          roasterLogoUrl: e.roaster.logoUrl,
-          count: 1,
-          ratingSum: e.rating ?? 0,
-          ratingCount: e.rating != null ? 1 : 0,
-        });
-      }
-    }
+    const statsMap = new Map(stats.map((s) => [s.coffeeId, s]));
 
-    return [...coffeeMap.values()]
-      .map((c) => ({
-        ...c,
-        avgRating: c.ratingCount > 0 ? c.ratingSum / c.ratingCount : null,
-      }))
+    return coffees
+      .map((c) => {
+        const stat = statsMap.get(c.id)!;
+        return {
+          ...c,
+          entryCount: stat._count,
+          avgRating: stat._avg.rating,
+        };
+      })
       .sort((a, b) => {
         const aRating = a.avgRating ?? -1;
         const bRating = b.avgRating ?? -1;
         if (bRating !== aRating) return bRating - aRating;
-        return b.count - a.count;
+        return b.entryCount - a.entryCount;
       });
   }
 

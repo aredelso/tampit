@@ -42,6 +42,8 @@ export class CoffeesController {
       roasterId?: number;
       name?: string;
       origin?: string;
+      variety?: string;
+      farm?: string;
       process?: string;
       description?: string;
       photoUrl?: string;
@@ -53,6 +55,8 @@ export class CoffeesController {
       body.roasterId,
       body.name,
       body.origin,
+      body.variety,
+      body.farm,
       body.process,
       body.description,
       body.photoUrl
@@ -66,6 +70,8 @@ export class CoffeesController {
     body: {
       name?: string;
       origin?: string;
+      variety?: string;
+      farm?: string;
       process?: string;
       description?: string;
       photoUrl?: string;
@@ -76,6 +82,8 @@ export class CoffeesController {
       Number(id),
       body.name,
       body.origin,
+      body.variety,
+      body.farm,
       body.process,
       body.description,
       body.photoUrl
@@ -96,6 +104,8 @@ export class CoffeesController {
     body: {
       name?: string;
       origin?: string;
+      variety?: string;
+      farm?: string;
       process?: string;
       description?: string;
       photoUrl?: string;
@@ -107,6 +117,8 @@ export class CoffeesController {
       userId,
       body.name,
       body.origin,
+      body.variety,
+      body.farm,
       body.process,
       body.description,
       body.photoUrl
@@ -121,6 +133,8 @@ export class CoffeesController {
     body: {
       name?: string;
       origin?: string;
+      variety?: string;
+      farm?: string;
       process?: string;
       description?: string;
       photoUrl?: string;
@@ -133,6 +147,8 @@ export class CoffeesController {
       Number(id),
       body.name,
       body.origin,
+      body.variety,
+      body.farm,
       body.process,
       body.description,
       body.photoUrl

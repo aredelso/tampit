@@ -34,6 +34,8 @@ model Coffee {
   id          Int           @id @default(autoincrement())
   name        String
   origin      String?
+  variety     String?
+  farm        String?
   process     String?
   description String?
   photoUrl    String?
@@ -154,7 +156,6 @@ model Recipe {
   updatedAt   DateTime @updatedAt
   title       String
   description String?
-  instructions String?
   brewMethod  String?
   grindSize   String?
   phases      Json     @default("[]")

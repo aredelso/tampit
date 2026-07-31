@@ -34,7 +34,6 @@ input RecipePhaseInput {
 input CreateRecipeInput {
   title: String!
   description: String
-  instructions: String
   brewMethod: String
   grindSize: String
   phases: [RecipePhaseInput!]!
@@ -47,7 +46,6 @@ input CreateRecipeInput {
 input UpdateRecipeInput {
   title: String
   description: String
-  instructions: String
   brewMethod: String
   grindSize: String
   phases: [RecipePhaseInput!]
@@ -136,7 +134,6 @@ type Recipe {
   id: Int!
   title: String!
   description: String
-  instructions: String
   brewMethod: String
   grindSize: String
   phases: [RecipePhase!]!

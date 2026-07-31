@@ -14,32 +14,33 @@ export class CoffeesService {
     select: { id: true, name: true, logoUrl: true },
   };
 
-  findAll(roasterId?: number) {
-    return this.prisma.coffee.findMany({
+  async findAll(roasterId?: number) {
+    const coffees = await this.prisma.coffee.findMany({
       where: roasterId ? { roasterId } : undefined,
       orderBy: { name: 'asc' },
       include: { roaster: this.roasterSelect },
     });
+
+    const coffeeWithStats = await Promise.all(
+      coffees.map((coffee) => this.attachStatsToCoffee(coffee))
+    );
+
+    return coffeeWithStats;
   }
 
   async findByOrigin(origin: string) {
     const coffees = await this.prisma.coffee.findMany({
       where: { origin },
-      include: {
-        roaster: this.roasterSelect,
-        entries: { select: { rating: true } },
-      },
+      include: { roaster: this.roasterSelect },
     });
-    return coffees
-      .map((c: any) => {
-        const rated = c.entries.filter((e: any) => e.rating != null);
-        const avgRating = rated.length
-          ? rated.reduce((s: number, e: any) => s + e.rating!, 0) / rated.length
-          : null;
-        const { entries, ...rest } = c;
-        return { ...rest, avgRating, entryCount: entries.length };
-      })
-      .sort((a: any, b: any) => (b.avgRating ?? -1) - (a.avgRating ?? -1));
+
+    const coffeeWithStats = await Promise.all(
+      coffees.map((coffee) => this.attachStatsToCoffee(coffee))
+    );
+
+    return coffeeWithStats.sort(
+      (a: any, b: any) => (b.avgRating ?? -1) - (a.avgRating ?? -1)
+    );
   }
 
   async findOne(id: number) {
@@ -48,20 +49,23 @@ export class CoffeesService {
       include: { roaster: this.roasterSelect },
     });
     if (!coffee) throw new NotFoundException('Coffee not found');
-    return coffee;
+
+    return this.attachStatsToCoffee(coffee);
   }
 
   async create(
     roasterId: number,
     name: string,
     origin?: string,
+    variety?: string,
+    farm?: string,
     process?: string,
     description?: string,
     photoUrl?: string
   ) {
     try {
       return await this.prisma.coffee.create({
-        data: { roasterId, name, origin, process, description, photoUrl },
+        data: { roasterId, name, origin, variety, farm, process, description, photoUrl },
         include: { roaster: this.roasterSelect },
       });
     } catch (err: any) {
@@ -75,6 +79,8 @@ export class CoffeesService {
     id: number,
     name: string,
     origin?: string,
+    variety?: string,
+    farm?: string,
     process?: string,
     description?: string,
     photoUrl?: string
@@ -82,7 +88,7 @@ export class CoffeesService {
     try {
       return await this.prisma.coffee.update({
         where: { id },
-        data: { name, origin, process, description, photoUrl },
+        data: { name, origin, variety, farm, process, description, photoUrl },
         include: { roaster: this.roasterSelect },
       });
     } catch (err: any) {
@@ -108,6 +114,8 @@ export class CoffeesService {
     userId: string,
     name: string,
     origin?: string,
+    variety?: string,
+    farm?: string,
     process?: string,
     description?: string,
     photoUrl?: string
@@ -126,6 +134,8 @@ export class CoffeesService {
           roasterId: roaster.id,
           name,
           origin,
+          variety,
+          farm,
           process,
           description,
           photoUrl,
@@ -144,6 +154,8 @@ export class CoffeesService {
     coffeeId: number,
     name: string,
     origin?: string,
+    variety?: string,
+    farm?: string,
     process?: string,
     description?: string,
     photoUrl?: string
@@ -166,7 +178,7 @@ export class CoffeesService {
     try {
       return await this.prisma.coffee.update({
         where: { id: coffeeId },
-        data: { name, origin, process, description, photoUrl },
+        data: { name, origin, variety, farm, process, description, photoUrl },
         include: { roaster: this.roasterSelect },
       });
     } catch (err: any) {
@@ -201,5 +213,18 @@ export class CoffeesService {
         throw new NotFoundException('Coffee not found');
       throw err;
     }
+  }
+
+  async attachStatsToCoffee(coffee: any) {
+    const stats = await this.prisma.coffeeEntry.aggregate({
+      where: { coffeeId: coffee.id },
+      _count: true,
+      _avg: { rating: true },
+    });
+    return {
+      ...coffee,
+      entryCount: stats._count,
+      avgRating: stats._avg.rating,
+    };
   }
 }

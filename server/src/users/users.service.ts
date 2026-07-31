@@ -104,4 +104,19 @@ export class UsersService {
       notes: e.notes,
     }));
   }
+
+  async updateUser(id: string, data: { photo?: string }) {
+    return this.prisma.user.update({
+      where: { id },
+      data: { ...(data.photo !== undefined && { photo: data.photo }) },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        photo: true,
+        roasterId: true,
+        userType: true,
+      },
+    });
+  }
 }

@@ -13,7 +13,6 @@ export type RecipePhase = {
 export type RecipePayload = {
   title: string;
   description?: string;
-  instructions?: string;
   brewMethod?: string;
   grindSize?: string;
   phases?: RecipePhase[];
@@ -32,7 +31,6 @@ export class RecipesService {
       id: r.id,
       title: r.title,
       description: r.description,
-      instructions: r.instructions,
       brewMethod: r.brewMethod,
       grindSize: r.grindSize,
       phases: r.phases,
@@ -93,7 +91,6 @@ export class RecipesService {
       data: {
         title: payload.title,
         description: payload.description ?? null,
-        instructions: payload.instructions ?? null,
         brewMethod: payload.brewMethod ?? null,
         grindSize: payload.grindSize ?? null,
         phases: payload.phases,
@@ -115,9 +112,6 @@ export class RecipesService {
         ...(payload.title && { title: payload.title }),
         ...(payload.description !== undefined && {
           description: payload.description ?? null,
-        }),
-        ...(payload.instructions !== undefined && {
-          instructions: payload.instructions ?? null,
         }),
         ...(payload.brewMethod !== undefined && {
           brewMethod: payload.brewMethod ?? null,

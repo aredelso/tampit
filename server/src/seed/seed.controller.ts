@@ -77,10 +77,14 @@ export class SeedController {
           process: e.process ?? null,
           description: e.description ?? null,
           photoUrl: e.coffeePhoto ?? null,
+          variety: e.variety ?? null,
+          farm: e.farm ?? null,
         },
         create: {
           name: e.coffee,
           origin: e.origin,
+          variety: e.variety ?? null,
+          farm: e.farm ?? null,
           process: e.process ?? null,
           description: e.description ?? null,
           photoUrl: e.coffeePhoto ?? null,
@@ -151,7 +155,6 @@ export class SeedController {
         data: {
           title: r.title,
           description: r.description,
-          instructions: r.instructions,
           brewMethod: r.brewMethod ?? null,
           grindSize: r.grindSize ?? null,
           phases: r.phases,
