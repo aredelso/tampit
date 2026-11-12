@@ -1,0 +1,31 @@
+node_modules/
+**/node_modules/
+.ec2-instance
+.env.local
+*.sqlite
+dist/
+.vscode/
+.client/node_modules/
+.server/node_modules/
+
+# Build output and generated files
+server/build/
+client/.next/
+client/out/
+*.tsbuildinfo
+
+# Environment files (never commit; use the .env.local files instead)
+.env
+.env.development
+.env.production
+.env.test
+
+# Local data, logs and uploads (never commit)
+*.log
+*_logs.txt
+*.db
+*.db-journal
+server/uploads/
+server/eng.traineddata
+.claude/settings.local.json
+.claude/scheduled_tasks.lock

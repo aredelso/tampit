@@ -1,0 +1,75 @@
+name: tampit
+
+# Values come from the root .env.local file. Compose only reads .env by default,
+# so always pass the flag:  docker compose --env-file .env.local up -d
+# (the npm "docker:*" scripts already do this).
+services:
+  db:
+    image: postgres:15
+    container_name: tampit-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:?set POSTGRES_USER in .env.local}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env.local}
+      POSTGRES_DB: ${POSTGRES_DB:?set POSTGRES_DB in .env.local}
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    ports:
+      - '5432:5432'
+
+  server:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    container_name: tampit-server
+    working_dir: /usr/src/app
+    entrypoint: ['/usr/src/app/docker-entrypoint.sh']
+    command: ['npm', 'run', 'dev']
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: 'postgresql://${POSTGRES_USER:?set POSTGRES_USER in .env.local}:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env.local}@db:5432/${POSTGRES_DB:?set POSTGRES_DB in .env.local}'
+      PORT: '4000'
+      NODE_ENV: development
+      JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in .env.local}
+      DEV_USER_EMAIL: ${DEV_USER_EMAIL:?set DEV_USER_EMAIL in .env.local}
+      DEV_USER_PASSWORD: ${DEV_USER_PASSWORD:?set DEV_USER_PASSWORD in .env.local}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      CHOKIDAR_USEPOLLING: 'true'
+    depends_on:
+      - db
+    ports:
+      - '4000:4000'
+    volumes:
+      - ./server:/usr/src/app
+      - /usr/src/app/node_modules
+    develop:
+      watch:
+        - action: rebuild
+          path: ./server/package.json
+
+  client:
+    build:
+      context: ./client
+      dockerfile: Dockerfile
+    container_name: tampit-client
+    restart: unless-stopped
+    environment:
+      NODE_ENV: development
+      NEXT_PUBLIC_API_URL: 'http://localhost:4000'
+      NEXT_PUBLIC_GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      API_URL: 'http://tampit-server:4000'
+    depends_on:
+      - server
+    ports:
+      - '3000:3000'
+    volumes:
+      - ./client:/usr/src/app
+      - /usr/src/app/node_modules
+      - /usr/src/app/.next
+    develop:
+      watch:
+        - action: rebuild
+          path: ./client/package.json
+
+volumes:
+  db_data:

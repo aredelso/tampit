@@ -1,0 +1,32 @@
+{
+  "name": "tampit",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "client": "npm --prefix client run dev",
+    "server": "npm --prefix server run dev",
+    "start": "concurrently \"npm run server\" \"npm run client\"",
+    "build": "npm --prefix server run build && npm --prefix client run build",
+    "build:server": "npm --prefix server run build",
+    "build:client": "npm --prefix client run build",
+    "docker": "docker-compose --env-file .env.local up",
+    "docker:down": "docker-compose --env-file .env.local down",
+    "docker:build": "docker-compose --env-file .env.local build",
+    "docker:rebuild": "docker-compose --env-file .env.local down && docker-compose --env-file .env.local build && docker-compose --env-file .env.local up",
+    "docker:reset": "docker-compose --env-file .env.local down -v && docker-compose --env-file .env.local build && docker-compose --env-file .env.local up",
+    "prepare": "husky install",
+    "migrate": "bash ./scripts/migrate.sh",
+    "migrate:new": "bash ./scripts/migrate.sh"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "devDependencies": {
+    "concurrently": "^10.0.7",
+    "prettier": "^3.10.1"
+  },
+  "private": true
+}

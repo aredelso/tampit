@@ -1,0 +1,24 @@
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "module": "commonjs",
+    "lib": ["ES2020"],
+    "moduleResolution": "node10",
+    // Type-only alias for the shared code in the repo root. The import is erased
+    // at runtime, so no runtime mapping is needed.
+    "paths": {
+      "@shared/*": ["../shared/*"]
+    },
+    // Compiled output goes to build/. rootDir is the repo root so that ../shared
+    // can be compiled too, which puts main.js at build/server/src/main.js
+    "outDir": "build",
+    "rootDir": "..",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true
+  },
+  "include": ["src/**/*", "../shared/**/*"]
+}
