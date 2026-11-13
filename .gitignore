@@ -29,3 +29,9 @@ server/uploads/
 server/eng.traineddata
 .claude/settings.local.json
 .claude/scheduled_tasks.lock
+
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/

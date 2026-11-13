@@ -34,9 +34,11 @@ services:
       DEV_USER_EMAIL: ${DEV_USER_EMAIL:?set DEV_USER_EMAIL in .env.local}
       DEV_USER_PASSWORD: ${DEV_USER_PASSWORD:?set DEV_USER_PASSWORD in .env.local}
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      AI_SERVICE_URL: 'http://ai:8000'
       CHOKIDAR_USEPOLLING: 'true'
     depends_on:
       - db
+      - ai
     ports:
       - '4000:4000'
     volumes:
@@ -46,6 +48,16 @@ services:
       watch:
         - action: rebuild
           path: ./server/package.json
+
+  # Python service for OCR and text extraction. Runs locally, with no external API.
+  ai:
+    build:
+      context: ./ai-service
+      dockerfile: Dockerfile
+    container_name: tampit-ai
+    restart: unless-stopped
+    ports:
+      - '8000:8000'
 
   client:
     build:

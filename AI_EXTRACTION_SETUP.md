@@ -1,122 +1,95 @@
-# Coffee Image AI Extraction Feature
+# AI Features: Coffee Label Extraction and Roaster Contact Lookup
 
-## What's Been Implemented
+The AI features run in a Python service (`ai-service/`). The NestJS server forwards requests to it, and the Next.js client calls the NestJS server as before. The service runs entirely locally: no external AI API and no API key.
 
-### Backend (Node.js/NestJS)
+```
+client (Next.js)  --->  server (NestJS, :4000)  --->  ai-service (FastAPI, :8000)
+                                                         |-- Tesseract OCR (label images, via pytesseract)
+                                                         `-- Rule-based extraction (standard library + httpx)
+```
 
-- **AI Service** (`server/src/ai/ai.service.ts`)
-  - `extractCoffeeDataFromImage(imagePath)` - Extracts coffee data from local image files
-  - `extractCoffeeDataFromBase64(base64Image, mediaType)` - Extracts data from base64 encoded images
-  - Uses Claude Sonnet 4 vision capabilities for accurate image analysis
+## What it does
 
-- **API Controller** (`server/src/ai/ai.controller.ts`)
-  - POST `/api/ai/extract-coffee-data` - File upload endpoint
-  - Supports JPEG, PNG, GIF, and WebP image formats
-  - Automatically cleans up temporary files after processing
+- **Coffee label extraction.** Upload a photo of a bag label. Tesseract reads the text. Known vocabularies (countries, processing methods, varieties) and label keywords such as "Origin:" pull out name, origin, variety, farm, process, and roaster name.
+- **Roaster contact email.** Given a roaster name, the service guesses likely website domains, fetches each page, and looks for a contact address. It prefers mailboxes such as `info@` and `hello@`, and it reads `mailto:` links.
 
-- **Module Integration** (`server/src/ai/ai.module.ts`)
-  - Added to main app module (`server/src/app.module.ts`)
-  - Fully integrated with NestJS dependency injection
+Because this is rule-based rather than a language model, it works best with labels that use clear keywords ("Origin: Kenya") and known terms. Unusual layouts may return fewer fields.
 
-### Frontend (React/Next.js)
+## Endpoints
 
-- **Updated CoffeeForm Component** (`client/src/components/CoffeeForm.tsx`)
-  - New "Extract from bag image" section with visual upload UI
-  - Handles image upload and sends to `/api/ai/extract-coffee-data`
-  - Auto-fills form fields with extracted data:
-    - Coffee name
-    - Origin
-    - Variety
-    - Farm
-    - Process
-    - Description
-    - Roaster name
-  - Shows loading state ("Analyzing image…") during extraction
-  - Displays error messages if extraction fails
+| Route (NestJS, public) | Python service | Purpose |
+| --- | --- | --- |
+| `POST /api/ai/extract-coffee-data` (multipart `image`) | `POST /extract-coffee-data` | Label extraction |
+| `POST /roasters/extract-contact-email` | `POST /contact-email` | Email from a website URL or content |
+| `POST /roasters/extract-contact-email-by-name` | `POST /roaster-contact-email` | Email from a roaster name |
 
-## Setup Instructions
+The Python service also has `GET /health`. Errors come back as `{"message": "..."}`. Validation problems return 400. The NestJS server passes these messages through.
 
-### 1. Set Anthropic API Key
+## Configuration
 
-Update your `.env.local` file in the server directory:
+No AI API key is needed. The only setting is where the server finds the service:
+
+- `AI_SERVICE_URL` (NestJS): Compose sets `http://ai:8000`. For host runs, `server/.env.local` uses `http://localhost:8000`.
+
+## Running
+
+With Docker (recommended):
 
 ```bash
-# server/.env.local
-ANTHROPIC_API_KEY=your-actual-api-key-here
+npm run docker              # starts db, ai, server and client
 ```
 
-Get your API key from: https://console.anthropic.com
-
-### 2. Ensure Database is Running
-
-Make sure PostgreSQL is running in WSL (as per your existing setup):
+Without Docker (host), you need Python 3.12 and Tesseract installed:
 
 ```bash
-# In WSL
-sudo service postgresql start
+cd ai-service
+python -m venv .venv && .venv/Scripts/activate   # Windows
+pip install -r requirements.txt
+uvicorn app.main:app --reload --port 8000
 ```
 
-### 3. Start the Application
+## Tests
+
+The Python tests need no network and no Tesseract. The OCR call is replaced with a stub, and page fetches use a fake HTTP client.
 
 ```bash
-npm start
+cd ai-service
+pytest -q
 ```
 
-This will start both the backend server (port 4000) and frontend (port 3000).
+To run them without a local Python install:
 
-## Testing the Feature
-
-1. **Navigate to the Coffee Form**
-   - Go to the "Add Coffee" page in your app
-   - Look for the "Extract from bag image" section below the Description field
-
-2. **Upload a Coffee Bag Image**
-   - Click on the "Extract from image" upload area
-   - Select a photo of a coffee bag label
-   - Wait for the analysis to complete
-
-3. **Verify Results**
-   - Form fields should auto-populate with extracted data
-   - Check that coffee name, origin, variety, farm, and process are correctly identified
-   - Error messages will appear if the image cannot be processed
-
-## Supported Image Formats
-
-- JPEG/JPG
-- PNG
-- GIF
-- WebP
-
-Maximum recommended image size: 20MB (for API efficiency)
-
-## API Response Format
-
-The `/api/ai/extract-coffee-data` endpoint returns JSON:
-
-```json
-{
-  "name": "Ethiopian Yirgacheffe",
-  "origin": "Ethiopia, Yirgacheffe",
-  "variety": "Heirloom",
-  "farm": "Worka",
-  "process": "Washed",
-  "roasterName": "Blue Bottle Coffee",
-  "description": "Bright acidity with floral notes"
-}
+```bash
+docker run --rm -v "$PWD:/app" -w /app python:3.12-slim sh -c "pip install -q -r requirements.txt && python -m pytest -q"
 ```
 
-Fields that couldn't be identified are omitted from the response.
-
-## curl Example
+## Example
 
 ```bash
 curl -X POST http://localhost:4000/api/ai/extract-coffee-data \
   -F "image=@path/to/coffee-bag.jpg"
 ```
 
-## Notes
+```json
+{
+  "name": "Kenya AA Washed",
+  "origin": "Kenya",
+  "farm": "Nyeri",
+  "process": "Washed"
+}
+```
 
-- The AI uses Claude Sonnet 4 for high accuracy with complex images
-- Images are processed server-side and temporary files are automatically cleaned up
-- All form fields can still be manually edited after extraction
-- The feature works best with clear, well-lit photos of coffee bag labels
+Fields the service cannot find are omitted. If nothing is recognised, the endpoint returns 400.
+
+## Supported images
+
+JPEG, PNG, GIF, and WebP. Clear, well-lit photos of the label give the best results, because OCR accuracy depends on image quality.
+
+## Files
+
+- `ai-service/app/main.py`: HTTP routes and error mapping
+- `ai-service/app/service.py`: OCR, the label flow, and the email lookup flow
+- `ai-service/app/extractors.py`: rule-based label parsing, email selection, and website guessing
+- `ai-service/app/parsing.py`: HTML-to-text and `mailto:` helpers
+- `server/src/ai/ai.service.ts`: NestJS client for the AI service
+- `server/src/ai/ai.controller.ts`: public upload endpoint
